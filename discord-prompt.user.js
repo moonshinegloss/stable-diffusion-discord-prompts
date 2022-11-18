@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.0
+// @version      1.1
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -34,7 +34,7 @@
                             const container_selector = images[i].closest(".messageAttachment-CZp8Iv")
                             const meta = readMetadata(new Uint8Array(res.response));
                             if(meta?.tEXt?.parameters && !container_selector.querySelector("#metadata")) {
-                                container_selector.innerHTML = `<button onclick="alert(\`${meta.tEXt.parameters}\`)" style="position: absolute;z-index: 9999;">Reveal Prompt</button>` + container_selector.innerHTML
+                                container_selector.outerHTML = `<div><details style="color:white;cursor: pointer;"><summary>Reveal Prompt</summary>${meta.tEXt.parameters}</details></div>` + container_selector.outerHTML
                             }
                         }
                     }catch(err){
