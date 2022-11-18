@@ -73,6 +73,8 @@ async function hook() {
 
 (async function() {
     'use strict';
+
+    // thanks to archon!
     GM_addStyle(`
           details[open] + div{
             border-top: 0 !important;
