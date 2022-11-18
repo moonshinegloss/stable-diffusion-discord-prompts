@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.4
+// @version      1.5
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -9,18 +9,45 @@
 // @grant        GM_addStyle
 // ==/UserScript==
 
-(async function() {
-    'use strict';
-    while(!document.querySelector(".chatContent-3KubbW")) {
+const ignoreDMs = true;
+
+async function refreshImages(nodes) {
+    nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'] img");
+    for(let i = 0; i < nodes.length; i++) {
+        let url = nodes[i].src.replace("media.discordapp.net","cdn.discordapp.com")
+        GM.xmlHttpRequest({
+            method: "GET",
+            url,
+            responseType: "arraybuffer",
+            onload: async function(res) {
+                try {
+                    if(res?.response) {
+                        const container_selector = nodes[i].closest("div[class*='messageAttachment-']")
+                        const meta = readMetadata(new Uint8Array(res.response));
+                        const borderColor = "rgba(88, 101, 242, 0.35)";
+                        if(meta?.tEXt?.parameters && !container_selector.querySelector("#metadata")) {
+                            container_selector.outerHTML = `
+                                  <details class="prompt" style="color:white;cursor: pointer;">
+                                    <summary style="list-style: none;background:${borderColor};border-top-left-radius: 5px; border-top-right-radius: 5px;padding:5px;margin-top:.25rem;">Reveal Prompt</summary>
+                                    <div style="border: 3px solid ${borderColor}"><p style="margin:5px">${meta.tEXt.parameters}</p></div>
+                                  </details>
+                                  <div style="border: 3px solid ${borderColor};margin-top:-.25rem;border-radius:7px;border-top-left-radius:0;">${container_selector.outerHTML}</div>
+                                `
+                        }
+                    }
+                }catch(err){
+                    console.log(err)
+                }
+            }
+        });
+    }
+}
+
+async function hook() {
+    const observableSelector = "main[class*='chatContent-']"
+    while(!document.querySelector(observableSelector)) {
         await new Promise(r => setTimeout(r, 200));
     }
-
-    GM_addStyle(`
-          details[open] + div{
-            border-top: 0 !important;
-            border-top-right-radius: 0 !important;
-          }
-    `);
 
     let observer = new MutationObserver(mutationRecords => {
         const images = [...new Set(mutationRecords.filter(x => {
@@ -29,43 +56,43 @@
         }).map(x => x?.target?.firstChild))];
 
         if(images.length == 0) return;
-
-        for(let i = 0; i < images.length; i++) {
-            let url = images[i].src.replace("media.discordapp.net","cdn.discordapp.com")
-            GM.xmlHttpRequest({
-                method: "GET",
-                url,
-                responseType: "arraybuffer",
-                onload: async function(res) {
-                    try {
-                        if(res?.response) {
-                            const container_selector = images[i].closest(".messageAttachment-CZp8Iv")
-                            const meta = readMetadata(new Uint8Array(res.response));
-                            const borderColor = "rgba(88, 101, 242, 0.35)";
-                            if(meta?.tEXt?.parameters && !container_selector.querySelector("#metadata")) {
-                                container_selector.outerHTML = `
-                                  <details class="prompt" style="color:white;cursor: pointer;">
-                                    <summary style="list-style: none;background:${borderColor};border-top-left-radius: 5px; border-top-right-radius: 5px;padding:5px;margin-top:.25rem;">Reveal Prompt</summary>
-                                    <div style="border: 3px solid ${borderColor}"><p style="margin:5px">${meta.tEXt.parameters}</p></div>
-                                  </details>
-                                  <div style="border: 3px solid ${borderColor};margin-top:-.25rem;border-radius:7px;border-top-left-radius:0;">${container_selector.outerHTML}</div>
-                                `
-                            }
-                        }
-                    }catch(err){
-                        console.log(err)
-                    }
-                }
-            });
-        }
+        refreshImages(images)
     });
 
-    // observe everything except attributes
-    observer.observe(document.querySelector(".app-2CXKsg"), {
+    // note the lack of .disconnect(); that's on purpose because the spec
+    // already garbage-collects the observer if the observable node is deleted
+    // further triggering an .observe() on the same item is a NOOP
+    observer.observe(document.querySelector(observableSelector), {
         childList: true, // observe direct children
         subtree: true, // and lower descendants too
         characterDataOldValue: true // pass old data to callback
     });
+}
+
+
+
+(async function() {
+    'use strict';
+    GM_addStyle(`
+          details[open] + div{
+            border-top: 0 !important;
+            border-top-right-radius: 0 !important;
+          }
+    `);
+
+    new MutationObserver(function(mutations) {
+        // ignore DMs for privacy sake by default
+        if(ignoreDMs && window.location.href.includes("@me")) return;
+
+        // refresh existing images that will not trigger change
+        refreshImages();
+
+        // hook into oncoming new images being added to chat
+        hook();
+    }).observe(
+        document.querySelector('title'),
+        { subtree: true, characterData: true, childList: true }
+    );
 })();
 
 
