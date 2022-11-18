@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.5
+// @version      1.6
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -25,14 +25,16 @@ async function refreshImages(nodes) {
                         const container_selector = nodes[i].closest("div[class*='messageAttachment-']")
                         const meta = readMetadata(new Uint8Array(res.response));
                         const borderColor = "rgba(88, 101, 242, 0.35)";
-                        if(meta?.tEXt?.parameters && !container_selector.querySelector("#metadata")) {
+
+                        // ignore images that have been processed already
+                        if(meta?.tEXt?.parameters && !container_selector.parentElement.className.includes("prompt-preview")) {
                             container_selector.outerHTML = `
-                                  <details class="prompt" style="color:white;cursor: pointer;">
-                                    <summary style="list-style: none;background:${borderColor};border-top-left-radius: 5px; border-top-right-radius: 5px;padding:5px;margin-top:.25rem;">Reveal Prompt</summary>
+                                  <details class="prompt" style="color:white">
+                                    <summary style="cursor: pointer;list-style: none;background:${borderColor};border-top-left-radius: 5px; border-top-right-radius: 5px;padding:5px;margin-top:.25rem;">Reveal Prompt</summary>
                                     <div style="border: 3px solid ${borderColor}"><p style="margin:5px">${meta.tEXt.parameters}</p></div>
                                   </details>
-                                  <div style="border: 3px solid ${borderColor};margin-top:-.25rem;border-radius:7px;border-top-left-radius:0;">${container_selector.outerHTML}</div>
-                                `
+                                  <div class="prompt-preview" style="border: 3px solid ${borderColor};margin-top:-.25rem;border-radius:7px;border-top-left-radius:0;">${container_selector.outerHTML}</div>
+                            `
                         }
                     }
                 }catch(err){
