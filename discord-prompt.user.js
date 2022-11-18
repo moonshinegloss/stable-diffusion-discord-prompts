@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.3
+// @version      1.4
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -15,10 +15,10 @@
         await new Promise(r => setTimeout(r, 200));
     }
 
-    // thanks to archon!
     GM_addStyle(`
           details[open] + div{
-            border-top: 5px !important;
+            border-top: 0 !important;
+            border-top-right-radius: 0 !important;
           }
     `);
 
