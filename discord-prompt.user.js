@@ -1,18 +1,26 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.1
+// @version      1.3
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
 // @grant        GM.xmlHttpRequest
+// @grant        GM_addStyle
 // ==/UserScript==
 
 (async function() {
     'use strict';
     while(!document.querySelector(".chatContent-3KubbW")) {
-        await new Promise(r => setTimeout(r, 500));
+        await new Promise(r => setTimeout(r, 200));
     }
+
+    // thanks to archon!
+    GM_addStyle(`
+          details[open] + div{
+            border-top: 5px !important;
+          }
+    `);
 
     let observer = new MutationObserver(mutationRecords => {
         const images = [...new Set(mutationRecords.filter(x => {
@@ -33,8 +41,15 @@
                         if(res?.response) {
                             const container_selector = images[i].closest(".messageAttachment-CZp8Iv")
                             const meta = readMetadata(new Uint8Array(res.response));
+                            const borderColor = "rgba(88, 101, 242, 0.35)";
                             if(meta?.tEXt?.parameters && !container_selector.querySelector("#metadata")) {
-                                container_selector.outerHTML = `<div><details style="color:white;cursor: pointer;"><summary>Reveal Prompt</summary>${meta.tEXt.parameters}</details></div>` + container_selector.outerHTML
+                                container_selector.outerHTML = `
+                                  <details class="prompt" style="color:white;cursor: pointer;">
+                                    <summary style="list-style: none;background:${borderColor};border-top-left-radius: 5px; border-top-right-radius: 5px;padding:5px;margin-top:.25rem;">Reveal Prompt</summary>
+                                    <div style="border: 3px solid ${borderColor}"><p style="margin:5px">${meta.tEXt.parameters}</p></div>
+                                  </details>
+                                  <div style="border: 3px solid ${borderColor};margin-top:-.25rem;border-radius:7px;border-top-left-radius:0;">${container_selector.outerHTML}</div>
+                                `
                             }
                         }
                     }catch(err){
