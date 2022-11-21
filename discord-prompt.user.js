@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.6
+// @version      1.7
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -24,17 +24,30 @@ async function refreshImages(nodes) {
                     if(res?.response) {
                         const container_selector = nodes[i].closest("div[class*='messageAttachment-']")
                         const meta = readMetadata(new Uint8Array(res.response));
-                        const borderColor = "rgba(88, 101, 242, 0.35)";
+                        let params = meta?.tEXt?.parameters
+
+                        if(!params && meta?.tEXt?.Dream) {
+                            params = `${meta?.tEXt?.Dream} ${meta?.tEXt['sd-metadata']}`
+                        }
 
                         // ignore images that have been processed already
-                        if(meta?.tEXt?.parameters && !container_selector.parentElement.className.includes("prompt-preview")) {
-                            container_selector.outerHTML = `
-                                  <details class="prompt" style="color:white">
-                                    <summary style="cursor: pointer;list-style: none;background:${borderColor};border-top-left-radius: 5px; border-top-right-radius: 5px;padding:5px;margin-top:.25rem;">Reveal Prompt</summary>
-                                    <div style="border: 3px solid ${borderColor}"><p style="margin:5px">${meta.tEXt.parameters}</p></div>
+                        if(params && !container_selector.className.includes("prompt-preview-container")) {
+                            // style the image preview, while preserving discord click events for spoilers/lightbox
+                            nodes[i].closest("div[class*='imageWrapper-']").classList.add("prompt-preview");
+                            nodes[i].closest("div[class*='spoilerContainer-']")?.classList.add("prompt-preview");
+
+                            container_selector.classList.add("prompt-preview-container");
+                            container_selector.style.flexDirection = "column";
+
+                            const revealPrompt = document.createElement("div");
+                            revealPrompt.innerHTML = `
+                                  <details style="color:white">
+                                    <summary class="promptBTN">Reveal Prompt</summary>
+                                    <div class="promptTXT"><p style="margin:5px">${params}</p></div>
                                   </details>
-                                  <div class="prompt-preview" style="border: 3px solid ${borderColor};margin-top:-.25rem;border-radius:7px;border-top-left-radius:0;">${container_selector.outerHTML}</div>
                             `
+
+                            container_selector.prepend(revealPrompt);
                         }
                     }
                 }catch(err){
@@ -76,11 +89,32 @@ async function hook() {
 (async function() {
     'use strict';
 
-    // thanks to archon!
+    const borderColor = "rgba(88, 101, 242, 0.35)";
     GM_addStyle(`
+          /* thanks to archon */
           details[open] + div{
             border-top: 0 !important;
             border-top-right-radius: 0 !important;
+          }
+
+          .promptTXT {
+            border: 3px solid ${borderColor};
+          }
+
+          .promptBTN {
+            cursor: pointer;
+            list-style: none;
+            background:${borderColor};
+            border-top-left-radius: 5px;
+            border-top-right-radius: 5px;
+            padding:5px;
+            margin-top:.25rem;
+          }
+
+          .prompt-preview {
+            border: 3px solid ${borderColor};
+            border-radius:7px;
+            border-top-left-radius:0;
           }
     `);
 
