@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.8
+// @version      1.9
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -65,7 +65,7 @@ async function refreshImages(nodes) {
     for(let i = nodes.length-1; i > 0; i--) {
         let url = nodes[i].src.replace("media.discordapp.net","cdn.discordapp.com")
         queue.push(processURL(url,nodes[i]))
-        if (i % workers === 0) await Promise.all(queue)
+        if (i % workers === 0 || nodes.length < workers) await Promise.all(queue)
     }
 }
 
