@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.7
+// @version      1.8
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -11,10 +11,8 @@
 
 const ignoreDMs = true;
 
-async function refreshImages(nodes) {
-    nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'] img");
-    for(let i = 0; i < nodes.length; i++) {
-        let url = nodes[i].src.replace("media.discordapp.net","cdn.discordapp.com")
+async function processURL(url,node) {
+    return new Promise((resolve) => {
         GM.xmlHttpRequest({
             method: "GET",
             url,
@@ -22,7 +20,7 @@ async function refreshImages(nodes) {
             onload: async function(res) {
                 try {
                     if(res?.response) {
-                        const container_selector = nodes[i].closest("div[class*='messageAttachment-']")
+                        const container_selector = node.closest("div[class*='messageAttachment-']")
                         const meta = readMetadata(new Uint8Array(res.response));
                         let params = meta?.tEXt?.parameters
 
@@ -33,8 +31,8 @@ async function refreshImages(nodes) {
                         // ignore images that have been processed already
                         if(params && !container_selector.className.includes("prompt-preview-container")) {
                             // style the image preview, while preserving discord click events for spoilers/lightbox
-                            nodes[i].closest("div[class*='imageWrapper-']").classList.add("prompt-preview");
-                            nodes[i].closest("div[class*='spoilerContainer-']")?.classList.add("prompt-preview");
+                            node.closest("div[class*='imageWrapper-']").classList.add("prompt-preview");
+                            node.closest("div[class*='spoilerContainer-']")?.classList.add("prompt-preview");
 
                             container_selector.classList.add("prompt-preview-container");
                             container_selector.style.flexDirection = "column";
@@ -50,11 +48,24 @@ async function refreshImages(nodes) {
                             container_selector.prepend(revealPrompt);
                         }
                     }
+
+                    resolve();
                 }catch(err){
                     console.log(err)
                 }
             }
         });
+    })
+}
+
+async function refreshImages(nodes) {
+    nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'] img");
+    const queue = []
+    const workers = 4
+    for(let i = nodes.length-1; i > 0; i--) {
+        let url = nodes[i].src.replace("media.discordapp.net","cdn.discordapp.com")
+        queue.push(processURL(url,nodes[i]))
+        if (i % workers === 0) await Promise.all(queue)
     }
 }
 
