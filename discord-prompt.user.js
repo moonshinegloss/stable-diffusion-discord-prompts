@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.1
+// @version      2.2
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -135,7 +135,7 @@ async function hook() {
     let observer = new MutationObserver(mutationRecords => {
         const images = [...new Set(mutationRecords.filter(x => {
             const source = x?.target?.firstChild?.src
-            return !!source && source.includes("attachments")
+            return !!source && source.includes(".png") && source.includes("media.") && source.includes("attachments");
         }).map(x => x?.target?.firstChild.closest("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")))];
 
         if(images.length == 0) return;
