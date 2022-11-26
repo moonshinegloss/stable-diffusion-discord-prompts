@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.0
+// @version      2.1
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -11,21 +11,46 @@
 
 const ignoreDMs = true;
 
-function addRevealPrompt(chunks,node) {
+function largeuint8ArrToString(uint8arr) {
+    return new Promise((resolve) => {
+        const f = new FileReader();
+        f.onload = function(e) {
+            resolve(e.target.result);
+        }
+        f.readAsText(new Blob([uint8arr]));
+    })
+}
+
+async function getMetaData(chunks) {
+    const meta = readMetadata(chunks)
+    if(meta?.tEXt?.Dream) {
+        return `${meta?.tEXt?.Dream} ${meta?.tEXt?.['sd-metadata']}`
+    }else if(meta?.tEXt?.parameters) {
+        return meta?.tEXt?.parameters
+    }
+
+    // fallback to simple text extraction
+    const textData = await largeuint8ArrToString(chunks)
+    if(textData.includes("IDAT")) {
+        const result = textData.split("IDAT")[0]
+            .replace(/[\s\S]+Xt(Dream|parameters)/,"")
+            .replace(/[^\x00-\x7F]/g,"")
+
+        if(result.length > 50) return result
+    }
+
+    return false;
+}
+
+async function addRevealPrompt(chunks,node) {
     try {
         const container_selector = node.closest("div[class*='messageAttachment-']")
-        const meta = readMetadata(chunks);
-        let params = meta?.tEXt?.parameters
-
-        if(!params && meta?.tEXt?.Dream) {
-            params = `${meta?.tEXt?.Dream} ${meta?.tEXt['sd-metadata']}`
-        }
+        const params = await getMetaData(chunks);
 
         // ignore images that have been processed already
         if(params && !container_selector.className.includes("prompt-preview-container")) {
             // style the image preview, while preserving discord click events for spoilers/lightbox
-            node.closest("div[class*='imageWrapper-']").classList.add("prompt-preview");
-            node.closest("div[class*='spoilerContainer-']")?.classList.add("prompt-preview");
+            node.classList.add("prompt-preview");
 
             container_selector.classList.add("prompt-preview-container");
             container_selector.style.flexDirection = "column";
@@ -56,34 +81,48 @@ async function processURL(url,node) {
                 responseType: "stream",
                 onloadstart: async (r) => {
                     const reader = r.response.getReader();
-                    // preload just enough, even for large prompts
-                    while(received < 50000) {
+
+                    // process up to 2MB, to capture even large prompts
+                    const kilobytes = 2000
+                    while(received < kilobytes*1000) {
                         const {done, value} = await reader.read();
                         if (done) break;
                         chunks.push(value);
                         received += value.length;
                     }
+
                     resolve(chunks)
+                    await reader.cancel();
+                    await req.abort()
                 }
             });
         })
 
         if(chunks.length > 0) {
-            addRevealPrompt(chunks[0],node);
+            await addRevealPrompt(chunks[0],node);
         }
 
+        node.classList.remove("prompt-preview-processing");
         finish();
     })
 }
 
 async function refreshImages(nodes) {
-    nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'] img");
-    const queue = []
-    const workers = 4
-    for(let i = nodes.length-1; i > 0; i--) {
-        let url = nodes[i].src.replace("media.discordapp.net","cdn.discordapp.com")
-        queue.push(processURL(url,nodes[i]))
-        if (i % workers === 0 || nodes.length < workers) await Promise.all(queue)
+    nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")
+    let queue = []
+    const workers = 8
+
+    for(let i = 0; i < nodes.length; i++) {
+        nodes[i].classList.add("prompt-preview-processing");
+
+        queue.push(() => {
+            const url = nodes[i].querySelector("img").src.replace("media.discordapp.net","cdn.discordapp.com")
+            processURL(url,nodes[i]);
+        })
+    }
+
+    while (queue.length) {
+        await Promise.all(queue.splice(0, workers).map(f => f()))
     }
 }
 
@@ -96,8 +135,8 @@ async function hook() {
     let observer = new MutationObserver(mutationRecords => {
         const images = [...new Set(mutationRecords.filter(x => {
             const source = x?.target?.firstChild?.src
-            return !!source && source.includes(".png") && source.includes("media.") && source.includes("attachments")
-        }).map(x => x?.target?.firstChild))];
+            return !!source && source.includes("attachments")
+        }).map(x => x?.target?.firstChild.closest("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")))];
 
         if(images.length == 0) return;
         refreshImages(images)
@@ -119,6 +158,7 @@ async function hook() {
     'use strict';
 
     const borderColor = "rgba(88, 101, 242, 0.35)";
+    const loadingColor = "rgba(255,255,0,0.35)";
     GM_addStyle(`
           /* thanks to archon */
           details[open] + div{
@@ -128,6 +168,11 @@ async function hook() {
 
           .promptTXT {
             border: 3px solid ${borderColor};
+          }
+
+          .prompt-preview-processing {
+            border: 3px solid ${loadingColor};
+            border-radius:7px;
           }
 
           .promptBTN {
