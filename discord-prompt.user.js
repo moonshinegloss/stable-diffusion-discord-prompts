@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.2
+// @version      2.3
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
