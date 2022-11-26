@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.3
+// @version      2.4
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -108,7 +108,7 @@ async function processURL(url,node) {
 }
 
 function validURL(source) {
-    return !!source && source.includes(".png") && source.includes("media.") && source.includes("attachments");
+    return !!source && source.includes(".png") && (source.includes("media.discordapp.net") || source.includes("cdn.discordapp.com")) && source.includes("attachments");
 }
 
 async function refreshImages(nodes) {
@@ -116,8 +116,8 @@ async function refreshImages(nodes) {
     let queue = []
     const workers = 8
 
-    for(let i = nodes.length-1; i > 0; i--) {
-        const source = nodes[i].querySelector("img").src
+    for(let i = nodes.length; i > 0; i--) {
+        const source = nodes?.[i]?.querySelector("img")?.src
         if(!validURL(source)) continue;
 
         nodes[i].classList.add("prompt-preview-processing");
