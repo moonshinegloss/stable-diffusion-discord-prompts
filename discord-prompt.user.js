@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      1.9
+// @version      2.0
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -11,50 +11,68 @@
 
 const ignoreDMs = true;
 
-async function processURL(url,node) {
-    return new Promise((resolve) => {
-        GM.xmlHttpRequest({
-            method: "GET",
-            url,
-            responseType: "arraybuffer",
-            onload: async function(res) {
-                try {
-                    if(res?.response) {
-                        const container_selector = node.closest("div[class*='messageAttachment-']")
-                        const meta = readMetadata(new Uint8Array(res.response));
-                        let params = meta?.tEXt?.parameters
+function addRevealPrompt(chunks,node) {
+    try {
+        const container_selector = node.closest("div[class*='messageAttachment-']")
+        const meta = readMetadata(chunks);
+        let params = meta?.tEXt?.parameters
 
-                        if(!params && meta?.tEXt?.Dream) {
-                            params = `${meta?.tEXt?.Dream} ${meta?.tEXt['sd-metadata']}`
-                        }
+        if(!params && meta?.tEXt?.Dream) {
+            params = `${meta?.tEXt?.Dream} ${meta?.tEXt['sd-metadata']}`
+        }
 
-                        // ignore images that have been processed already
-                        if(params && !container_selector.className.includes("prompt-preview-container")) {
-                            // style the image preview, while preserving discord click events for spoilers/lightbox
-                            node.closest("div[class*='imageWrapper-']").classList.add("prompt-preview");
-                            node.closest("div[class*='spoilerContainer-']")?.classList.add("prompt-preview");
+        // ignore images that have been processed already
+        if(params && !container_selector.className.includes("prompt-preview-container")) {
+            // style the image preview, while preserving discord click events for spoilers/lightbox
+            node.closest("div[class*='imageWrapper-']").classList.add("prompt-preview");
+            node.closest("div[class*='spoilerContainer-']")?.classList.add("prompt-preview");
 
-                            container_selector.classList.add("prompt-preview-container");
-                            container_selector.style.flexDirection = "column";
+            container_selector.classList.add("prompt-preview-container");
+            container_selector.style.flexDirection = "column";
 
-                            const revealPrompt = document.createElement("div");
-                            revealPrompt.innerHTML = `
+            const revealPrompt = document.createElement("div");
+            revealPrompt.innerHTML = `
                                   <details style="color:white">
                                     <summary class="promptBTN">Reveal Prompt</summary>
                                     <div class="promptTXT"><p style="margin:5px">${params}</p></div>
                                   </details>
                             `
 
-                            container_selector.prepend(revealPrompt);
-                        }
-                    }
+            container_selector.prepend(revealPrompt);
+        }
+    }catch(err){
+        console.log(err)
+    }
+}
 
-                    resolve();
-                }catch(err){
-                    console.log(err)
+async function processURL(url,node) {
+    return new Promise(async (finish) => {
+        const chunks = await new Promise(function(resolve){
+            let chunks = [];
+            let received = 0;
+            const req = GM.xmlHttpRequest({
+                method: "GET",
+                url,
+                responseType: "stream",
+                onloadstart: async (r) => {
+                    const reader = r.response.getReader();
+                    // preload just enough, even for large prompts
+                    while(received < 50000) {
+                        const {done, value} = await reader.read();
+                        if (done) break;
+                        chunks.push(value);
+                        received += value.length;
+                    }
+                    resolve(chunks)
                 }
-            }
-        });
+            });
+        })
+
+        if(chunks.length > 0) {
+            addRevealPrompt(chunks[0],node);
+        }
+
+        finish();
     })
 }
 
@@ -181,8 +199,6 @@ function textDecode (data) {
 		} else {
 			if (code) {
 				text += String.fromCharCode(code)
-			} else {
-				throw new Error('Invalid NULL character found. 0x00 character is not permitted in tEXt content')
 			}
 		}
 	}
@@ -276,10 +292,6 @@ function extractChunks (data) {
 			name: name,
 			data: chunkData
 		})
-	}
-
-	if (!ended) {
-		throw new Error('.png file ended prematurely: no IEND header was found')
 	}
 
 	return chunks
