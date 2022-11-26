@@ -107,16 +107,23 @@ async function processURL(url,node) {
     })
 }
 
+function validURL(source) {
+    return !!source && source.includes(".png") && source.includes("media.") && source.includes("attachments");
+}
+
 async function refreshImages(nodes) {
     nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")
     let queue = []
     const workers = 8
 
-    for(let i = 0; i < nodes.length; i++) {
+    for(let i = nodes.length-1; i > 0; i--) {
+        const source = nodes[i].querySelector("img").src
+        if(!validURL(source)) continue;
+
         nodes[i].classList.add("prompt-preview-processing");
 
         queue.push(() => {
-            const url = nodes[i].querySelector("img").src.replace("media.discordapp.net","cdn.discordapp.com")
+            const url = source.replace("media.discordapp.net","cdn.discordapp.com")
             processURL(url,nodes[i]);
         })
     }
@@ -135,7 +142,7 @@ async function hook() {
     let observer = new MutationObserver(mutationRecords => {
         const images = [...new Set(mutationRecords.filter(x => {
             const source = x?.target?.firstChild?.src
-            return !!source && source.includes(".png") && source.includes("media.") && source.includes("attachments");
+            return validURL(source);
         }).map(x => x?.target?.firstChild.closest("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")))];
 
         if(images.length == 0) return;
