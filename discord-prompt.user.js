@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.5
+// @version      2.6
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -24,16 +24,18 @@ function largeuint8ArrToString(uint8arr) {
 async function getMetaData(chunks) {
     const meta = readMetadata(chunks)
     if(meta?.tEXt?.Dream) {
-        return `${meta?.tEXt?.Dream} ${meta?.tEXt?.['sd-metadata']}`
+        return `${meta?.tEXt?.Dream} ${meta?.tEXt?.['sd-metadata'] || ''}`
     }else if(meta?.tEXt?.parameters) {
         return meta?.tEXt?.parameters
     }
 
     // fallback to simple text extraction
     const textData = await largeuint8ArrToString(chunks)
-    if(textData.includes("IDAT")) {
+    const textTypes = ["Dream","parameters"]
+
+    if(textData.includes("IDAT") && textTypes.some(x => textData.includes(x))) {
         const result = textData.split("IDAT")[0]
-            .replace(/[\s\S]+Xt(Dream|parameters)/,"")
+            .replace(new RegExp(`[\\s\\S]+Xt(${textTypes.join('|')})`),"")
             .replace(/[^\x00-\x7F]/g,"")
 
         if(result.length > 50) return result
