@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.6
+// @version      2.7
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -10,6 +10,7 @@
 // ==/UserScript==
 
 const ignoreDMs = true;
+const showLoadingBorder = true;
 
 function largeuint8ArrToString(uint8arr) {
     return new Promise((resolve) => {
@@ -22,7 +23,11 @@ function largeuint8ArrToString(uint8arr) {
 }
 
 async function getMetaData(chunks) {
-    const meta = readMetadata(chunks)
+    let meta
+    try{
+        meta = readMetadata(chunks)
+    }catch(_){}
+
     if(meta?.tEXt?.Dream) {
         return `${meta?.tEXt?.Dream} ${meta?.tEXt?.['sd-metadata'] || ''}`
     }else if(meta?.tEXt?.parameters) {
@@ -104,7 +109,8 @@ async function processURL(url,node) {
             await addRevealPrompt(chunks[0],node);
         }
 
-        node.classList.remove("prompt-preview-processing");
+        if(showLoadingBorder) node.classList.remove("prompt-preview-processing");
+        node.classList.add("processed");
         finish();
     })
 }
@@ -120,9 +126,10 @@ async function refreshImages(nodes) {
 
     for(let i = nodes.length-1; i >= 0; i--) {
         const source = nodes?.[i]?.querySelector("img")?.src
-        if(!validURL(source)) continue;
 
-        nodes[i].classList.add("prompt-preview-processing");
+        if(!validURL(source)) continue;
+        if(nodes[i].className.includes("processed")) continue;
+        if(showLoadingBorder) nodes[i].classList.add("prompt-preview-processing");
 
         queue.push(() => {
             const url = source.replace("media.discordapp.net","cdn.discordapp.com")
