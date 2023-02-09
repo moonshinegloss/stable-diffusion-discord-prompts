@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      2.7
+// @version      3.0
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -49,26 +49,71 @@ async function getMetaData(chunks) {
     return false;
 }
 
+function sanitize(input) {
+  const div = document.createElement('div');
+  div.innerText = input;
+  return div.innerHTML;
+}
+
 async function addRevealPrompt(chunks,node) {
     try {
         const container_selector = node.closest("div[class*='messageAttachment-']")
-        const params = await getMetaData(chunks);
+        let params = await getMetaData(chunks);
 
         // ignore images that have been processed already
         if(params && !container_selector.className.includes("prompt-preview-container")) {
             // style the image preview, while preserving discord click events for spoilers/lightbox
             node.classList.add("prompt-preview");
 
+            const tag = (name,value) => `<div class="tag"><span>${sanitize(name)}</span><span>${sanitize(value)}</span></div>`
+            let tags_html = tag("Prompt",params)
+
+            if (params.includes("Steps:")) {
+              let parameters = params
+                .split("Steps:")[1]
+                .split(",")
+                .map((x, i) => {
+                  const ret = x.split(":").map((y) => y.trim());
+                  return i == 0 ? ["Steps", ...ret] : ret;
+                });
+
+              // add negative prompt first so it'll be second if present
+              let prompts = params.split("Steps:")[0];
+              if (params.includes("Negative prompt:")) {
+                const negative_prompt = prompts.split("Negative prompt:")[1];
+                prompts = prompts.split("Negative prompt:")[0];
+                parameters.unshift(["Negative", negative_prompt.trim()]);
+              }
+
+              // add prompt up front
+              parameters.unshift(["Prompt", prompts.trim()]);
+
+              parameters = parameters.map(
+                (x) => tag(...x)
+              );
+
+              tags_html = parameters.splice(0, 7).join("");
+
+              if(parameters.length > 7) {
+                tags_html += `
+                  <details style="color:white">
+                    <summary class="showParametersBTN">Show All</summary>
+                    <div class="parametersTXT">${parameters.splice(7).join("")}</div>
+                  </details>
+                `;
+              }
+            }
+
             container_selector.classList.add("prompt-preview-container");
             container_selector.style.flexDirection = "column";
 
             const revealPrompt = document.createElement("div");
             revealPrompt.innerHTML = `
-                                  <details style="color:white">
-                                    <summary class="promptBTN">Reveal Prompt</summary>
-                                    <div class="promptTXT"><p style="margin:5px">${params}</p></div>
-                                  </details>
-                            `
+                <details style="color:white">
+                  <summary class="promptBTN">Reveal Prompt</summary>
+                  <div class="promptTXT">${tags_html}</div>
+                </details>
+            `;
 
             container_selector.prepend(revealPrompt);
         }
@@ -125,20 +170,20 @@ async function refreshImages(nodes) {
     const workers = 4
 
     for(let i = nodes.length-1; i >= 0; i--) {
-        const source = nodes?.[i]?.querySelector("img")?.src
+      const source = nodes?.[i]?.querySelector("img")?.src
 
-        if(!validURL(source)) continue;
-        if(nodes[i].className.includes("processed")) continue;
-        if(showLoadingBorder) nodes[i].classList.add("prompt-preview-processing");
+      if(!validURL(source)) continue;
+      if(nodes[i].className.includes("processed")) continue;
+      if(showLoadingBorder) nodes[i].classList.add("prompt-preview-processing");
 
-        queue.push(() => {
-            const url = source.replace("media.discordapp.net","cdn.discordapp.com")
-            processURL(url,nodes[i]);
-        })
+      queue.push(() => {
+          const url = source.replace("media.discordapp.net","cdn.discordapp.com")
+          processURL(url,nodes[i]);
+      })
     }
 
     while (queue.length) {
-        await Promise.all(queue.splice(0, workers).map(f => f()))
+      await Promise.all(queue.splice(0, workers).map(f => f()))
     }
 }
 
@@ -184,6 +229,12 @@ async function hook() {
 
           .promptTXT {
             border: 3px solid ${borderColor};
+            padding: 20px;
+          }
+
+          .parametersTXT, .promptTXT {
+            padding-top: 10px;
+            padding-bottom:0;
           }
 
           .prompt-preview-processing {
@@ -205,6 +256,31 @@ async function hook() {
             border: 3px solid ${borderColor};
             border-radius:7px;
             border-top-left-radius:0;
+          }
+
+          .tag {
+            margin-bottom: 8px;
+          }
+
+          .showParametersBTN {
+            background: ${borderColor};
+            cursor: pointer;
+            display: block;
+            padding: 10px 30px;
+            text-align: center;
+            margin-top: 10px;
+            margin-left: -20px;
+            margin-right: -20px;
+          }
+
+          .tag span:first-of-type {
+            margin-left: -20px;
+            background: ${borderColor};
+            padding: 5px;
+            display: inline-block;
+            margin-right: 10px;
+            border-top-right-radius: 5px;
+            border-bottom-right-radius: 5px;
           }
     `);
 
