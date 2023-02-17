@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      3.0
+// @version      3.1
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -65,16 +65,22 @@ async function addRevealPrompt(chunks,node) {
             // style the image preview, while preserving discord click events for spoilers/lightbox
             node.classList.add("prompt-preview");
 
-            const tag = (name,value) => `<div class="tag"><span>${sanitize(name)}</span><span>${sanitize(value)}</span></div>`
+            const tag = (name,value) => {
+              const sanitizedValue = sanitize(value);
+              return `<div class="tag"><span>${sanitize(name)}</span>${((sanitizedValue.length > 30) ? `<p>${sanitizedValue}</p>` : `<span>${sanitizedValue}</span>`)}</div>`;
+            }
+
             let tags_html = tag("Prompt",params)
 
             if (params.includes("Steps:")) {
               let parameters = params
                 .split("Steps:")[1]
-                .split(",")
+                .split(/, +(?=(?:(?:[^"]*"){2})*[^"]*$)/)
                 .map((x, i) => {
-                  const ret = x.split(":").map((y) => y.trim());
-                  return i == 0 ? ["Steps", ...ret] : ret;
+                  const colonIndex = x.indexOf(":");
+                  return i == 0
+                    ? ["Steps", x.slice(colonIndex + 1)]
+                    : [x.slice(0, colonIndex), x.slice(colonIndex + 1)];
                 });
 
               // add negative prompt first so it'll be second if present
@@ -108,18 +114,51 @@ async function addRevealPrompt(chunks,node) {
             container_selector.style.flexDirection = "column";
 
             const revealPrompt = document.createElement("div");
-            revealPrompt.innerHTML = `
-                <details style="color:white">
-                  <summary class="promptBTN">Reveal Prompt</summary>
-                  <div class="promptTXT">${tags_html}</div>
-                </details>
-            `;
+            const uniqueID = (Math.random() + 1).toString(36).substring(2);
+
+            const promptBTN = document.createElement("div");
+            promptBTN.classList.add("promptBTN");
+            promptBTN.innerHTML = "Reveal Prompt"
+            revealPrompt.appendChild(promptBTN);
+
+            const promptTXT = document.createElement("div");
+            promptTXT.classList.add("promptTXT");
+            promptTXT.id = `reveal-prompt-${uniqueID}`;
+            promptTXT.innerHTML = tags_html;
+            revealPrompt.appendChild(promptTXT);
 
             container_selector.prepend(revealPrompt);
+            promptBTN.onmousedown = () =>
+              showDialog(`#reveal-prompt-${uniqueID}`);
         }
     }catch(err){
         console.log(err)
     }
+}
+
+function showDialog(selector) {
+  let promptDialog = document.querySelector("prompt-reveal-dialog");
+
+  if (promptDialog == null) {
+    promptDialog = document.createElement("dialog");
+    promptDialog.id = "prompt-reveal-dialog";
+    promptDialog.classList.add("prompt-reveal-dialog");
+
+    const dialogContainer = document.createElement("div");
+    dialogContainer.id = "prompt-reveal-dialog-container"
+    promptDialog.appendChild(dialogContainer);
+
+    document.body.appendChild(promptDialog);
+  }
+
+  promptDialog.querySelector("div").innerHTML = document.querySelector(selector).innerHTML;
+  promptDialog.addEventListener("click", function (e) {
+    if (!e.target.closest("#prompt-reveal-dialog-container")) {
+      e.target.close();
+    }
+  });
+
+  promptDialog.showModal();
 }
 
 async function processURL(url,node) {
@@ -218,18 +257,30 @@ async function hook() {
 (async function() {
     'use strict';
 
-    const borderColor = "rgba(88, 101, 242, 0.35)";
-    const loadingColor = "rgba(255,255,0,0.35)";
     GM_addStyle(`
-          /* thanks to archon */
-          details[open] + div{
-            border-top: 0 !important;
-            border-top-right-radius: 0 !important;
+          :root {
+            --borderColor: rgba(88, 101, 242, 0.35);
+            --loadingColor: rgba(255,255,0,0.35);
+          }
+
+          .promptTXT:target {
+            display: block;
           }
 
           .promptTXT {
-            border: 3px solid ${borderColor};
-            padding: 20px;
+            border: 3px solid var(--borderColor);
+            display: none;
+            border-radius: 15px;
+            background: #2b2d31;
+            position: absolute;
+            color: white;
+            left: 50%;
+            transform: translateX(-50%);
+            border-radius: 10px;
+          }
+
+          .promptTXT p {
+            padding: 0 20px;
           }
 
           .parametersTXT, .promptTXT {
@@ -238,24 +289,42 @@ async function hook() {
           }
 
           .prompt-preview-processing {
-            border: 3px solid ${loadingColor};
+            border: 3px solid var(--loadingColor);
             border-radius:7px;
           }
 
           .promptBTN {
             cursor: pointer;
             list-style: none;
-            background:${borderColor};
+            background:var(--borderColor);
             border-top-left-radius: 5px;
             border-top-right-radius: 5px;
             padding:5px;
             margin-top:.25rem;
+            color: white;
           }
 
           .prompt-preview {
-            border: 3px solid ${borderColor};
+            border: 3px solid var(--borderColor);
             border-radius:7px;
             border-top-left-radius:0;
+          }
+
+          #prompt-reveal-dialog {
+            background: #313338;
+            color: white;
+            border: 3px solid var(--borderColor);
+            border-radius: 10px;
+            padding: 0;
+            max-width: 500px;
+          }
+
+          #prompt-reveal-dialog-container {
+            padding: 20px;
+          }
+
+          #prompt-reveal-dialog::backdrop {
+            background-color: rgba(0,0,0,0.7);
           }
 
           .tag {
@@ -263,24 +332,39 @@ async function hook() {
           }
 
           .showParametersBTN {
-            background: ${borderColor};
+            background: var(--borderColor);
             cursor: pointer;
             display: block;
             padding: 10px 30px;
             text-align: center;
             margin-top: 10px;
-            margin-left: -20px;
-            margin-right: -20px;
+            border-radius: 10px;
+          }
+
+          .promptBTN a {
+            color: white;
+          }
+
+          .closeBTN {
+            margin-top: -10px;
           }
 
           .tag span:first-of-type {
-            margin-left: -20px;
-            background: ${borderColor};
+            background: var(--borderColor);
             padding: 5px;
             display: inline-block;
             margin-right: 10px;
-            border-top-right-radius: 5px;
-            border-bottom-right-radius: 5px;
+            border-radius: 5px;
+          }
+
+          .promptTXT .tag:first-of-type {
+            margin-top: 8px;
+          }
+
+          /* thanks to archon */
+          details[open] + div{
+            border-top: 0 !important;
+            border-top-right-radius: 0 !important;
           }
     `);
 
