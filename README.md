@@ -7,4 +7,6 @@ Note by default the extension ignores DMs for privacy sake, but if you want it t
 
 ![image](https://user-images.githubusercontent.com/118488816/202602875-fca31bce-5fe6-4fe0-975c-e2d68710fb4c.png)
 
-![image](https://user-images.githubusercontent.com/118488816/217673136-5994c7c1-7e89-468a-a705-26bec73d1f07.png)
+![image](https://user-images.githubusercontent.com/118488816/219686117-f67fd822-fe2b-4e2d-85f5-d63c9c130fa6.png)
+
+![image](https://user-images.githubusercontent.com/118488816/219686237-7580a371-0b1c-44ce-8e71-e81d5c473ec8.png)
