@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      3.1
+// @version      3.2
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -98,13 +98,12 @@ async function addRevealPrompt(chunks,node) {
                 (x) => tag(...x)
               );
 
-              tags_html = parameters.splice(0, 7).join("");
-
-              if(parameters.length > 7) {
+              tags_html = parameters.splice(0,7).join("");
+              if(parameters.length) {
                 tags_html += `
                   <details style="color:white">
                     <summary class="showParametersBTN">Show All</summary>
-                    <div class="parametersTXT">${parameters.splice(7).join("")}</div>
+                    <div class="parametersTXT">${parameters.join("")}</div>
                   </details>
                 `;
               }
