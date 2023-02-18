@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         png metadata discord
 // @author       moonshine
-// @version      3.2
+// @version      3.3
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -65,92 +65,99 @@ async function addRevealPrompt(chunks,node) {
             // style the image preview, while preserving discord click events for spoilers/lightbox
             node.classList.add("prompt-preview");
 
-            const tag = (name,value) => {
-              const sanitizedValue = sanitize(value);
-              return `<div class="tag"><span>${sanitize(name)}</span>${((sanitizedValue.length > 30) ? `<p>${sanitizedValue}</p>` : `<span>${sanitizedValue}</span>`)}</div>`;
-            }
-
-            let tags_html = tag("Prompt",params)
-
-            if (params.includes("Steps:")) {
-              let parameters = params
-                .split("Steps:")[1]
-                .split(/, +(?=(?:(?:[^"]*"){2})*[^"]*$)/)
-                .map((x, i) => {
-                  const colonIndex = x.indexOf(":");
-                  return i == 0
-                    ? ["Steps", x.slice(colonIndex + 1)]
-                    : [x.slice(0, colonIndex), x.slice(colonIndex + 1)];
-                });
-
-              // add negative prompt first so it'll be second if present
-              let prompts = params.split("Steps:")[0];
-              if (params.includes("Negative prompt:")) {
-                const negative_prompt = prompts.split("Negative prompt:")[1];
-                prompts = prompts.split("Negative prompt:")[0];
-                parameters.unshift(["Negative", negative_prompt.trim()]);
-              }
-
-              // add prompt up front
-              parameters.unshift(["Prompt", prompts.trim()]);
-
-              parameters = parameters.map(
-                (x) => tag(...x)
-              );
-
-              tags_html = parameters.splice(0,7).join("");
-              if(parameters.length) {
-                tags_html += `
-                  <details style="color:white">
-                    <summary class="showParametersBTN">Show All</summary>
-                    <div class="parametersTXT">${parameters.join("")}</div>
-                  </details>
-                `;
-              }
-            }
-
             container_selector.classList.add("prompt-preview-container");
             container_selector.style.flexDirection = "column";
-
-            const revealPrompt = document.createElement("div");
-            const uniqueID = (Math.random() + 1).toString(36).substring(2);
 
             const promptBTN = document.createElement("div");
             promptBTN.classList.add("promptBTN");
             promptBTN.innerHTML = "Reveal Prompt"
-            revealPrompt.appendChild(promptBTN);
 
-            const promptTXT = document.createElement("div");
-            promptTXT.classList.add("promptTXT");
-            promptTXT.id = `reveal-prompt-${uniqueID}`;
-            promptTXT.innerHTML = tags_html;
-            revealPrompt.appendChild(promptTXT);
-
-            container_selector.prepend(revealPrompt);
-            promptBTN.onmousedown = () =>
-              showDialog(`#reveal-prompt-${uniqueID}`);
+            container_selector.prepend(promptBTN);
+            promptBTN.onmousedown = () => showDialog(params);
         }
     }catch(err){
         console.log(err)
     }
 }
 
-function showDialog(selector) {
+function showDialog(params) {
   let promptDialog = document.querySelector("prompt-reveal-dialog");
+  let dialogContainer = promptDialog?.querySelector("div");
 
   if (promptDialog == null) {
     promptDialog = document.createElement("dialog");
     promptDialog.id = "prompt-reveal-dialog";
     promptDialog.classList.add("prompt-reveal-dialog");
 
-    const dialogContainer = document.createElement("div");
+    dialogContainer = document.createElement("div");
     dialogContainer.id = "prompt-reveal-dialog-container"
     promptDialog.appendChild(dialogContainer);
 
     document.body.appendChild(promptDialog);
   }
 
-  promptDialog.querySelector("div").innerHTML = document.querySelector(selector).innerHTML;
+  const tag = (name,value) => {
+      const sanitizedValue = sanitize(value);
+      return `<div class="tag"><span>${sanitize(name)}</span>${((sanitizedValue.length > 30) ? `<p>${sanitizedValue}</p>` : `<span>${sanitizedValue}</span>`)}</div>`;
+  }
+
+  let tags_html = tag("Prompt",params)
+
+  if (params.includes("Steps:")) {
+      let parameters = params
+      .split("Steps:")[1]
+      .split(/, +(?=(?:(?:[^"]*"){2})*[^"]*$)/)
+      .map((x, i) => {
+          const colonIndex = x.indexOf(":");
+          return i == 0
+              ? ["Steps", x.slice(colonIndex + 1)]
+          : [x.slice(0, colonIndex), x.slice(colonIndex + 1)];
+      });
+
+      // add negative prompt first so it'll be second if present
+      let prompts = params.split("Steps:")[0];
+      if (params.includes("Negative prompt:")) {
+          const negative_prompt = prompts.split("Negative prompt:")[1];
+          prompts = prompts.split("Negative prompt:")[0];
+          parameters.unshift(["Negative", negative_prompt.trim()]);
+      }
+
+      // add prompt up front
+      parameters.unshift(["Prompt", prompts.trim()]);
+
+      parameters = parameters.map(
+          (x) => tag(...x)
+      );
+
+      tags_html = parameters.splice(0,10).join("");
+
+      if(parameters.length) {
+          tags_html += `
+                  <details style="color:white">
+                    <summary class="fullBTN">Show All</summary>
+                    <div class="parametersTXT">${parameters.join("")}</div>
+                  </details>
+                `;
+      }
+  }
+
+  dialogContainer.innerHTML = tags_html;
+
+  const clipboardBTN = document.createElement("div");
+  clipboardBTN.classList.add("fullBTN");
+  clipboardBTN.innerHTML = "Copy Metadata";
+
+  const lastTag = dialogContainer.querySelector(".tag:last-of-type");
+  lastTag.parentNode.insertBefore(clipboardBTN, lastTag.nextSibling);
+
+  clipboardBTN.onmousedown = () => {
+      navigator.clipboard.writeText(params)
+      clipboardBTN.innerHTML = "Copied!"
+      setTimeout(() => {
+        clipboardBTN.innerHTML = "Copy Metadata"
+      }, 3000)
+  };
+
   promptDialog.addEventListener("click", function (e) {
     if (!e.target.closest("#prompt-reveal-dialog-container")) {
       e.target.close();
@@ -330,13 +337,13 @@ async function hook() {
             margin-bottom: 8px;
           }
 
-          .showParametersBTN {
+          .fullBTN {
+            margin-top: 15px;
             background: var(--borderColor);
             cursor: pointer;
             display: block;
             padding: 10px 30px;
             text-align: center;
-            margin-top: 10px;
             border-radius: 10px;
           }
 
