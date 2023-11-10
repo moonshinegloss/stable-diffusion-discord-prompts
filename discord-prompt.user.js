@@ -2,7 +2,7 @@
 // @name         png metadata discord
 // @description  Adds a button to reveal the prompt hidden in a png image, if it has one.
 // @author       moonshine
-// @version      3.3
+// @version      3.4
 // @downloadURL  https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
