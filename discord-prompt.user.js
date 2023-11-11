@@ -1,7 +1,9 @@
 // ==UserScript==
 // @name         png metadata discord
+// @description  Adds a button to reveal the prompt hidden in a png image, if it has one.
 // @author       moonshine
-// @version      3.3
+// @version      3.4
+// @downloadURL  https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=discord.com
@@ -11,6 +13,22 @@
 
 const ignoreDMs = true;
 const showLoadingBorder = true;
+const debug = false;
+
+// DO NOT EDIT BELOW THIS LINE
+
+const containerSelector = "div[class*='messageAttachment_']";
+const imageSelector = "div[class*='imageWrapper_'], div[class*='spoilerContainer_']";
+const observableSelector = "main[class*='chatContent_']";
+
+
+function log(...args) {
+    if (!debug) return;
+
+    // helps with filtering
+    const prefix = "[Discord Prompt] ";
+    console.log(prefix, ...args);
+}
 
 function largeuint8ArrToString(uint8arr) {
     return new Promise((resolve) => {
@@ -57,7 +75,7 @@ function sanitize(input) {
 
 async function addRevealPrompt(chunks,node) {
     try {
-        const container_selector = node.closest("div[class*='messageAttachment-']")
+        const container_selector = node.closest(containerSelector);
         let params = await getMetaData(chunks);
 
         // ignore images that have been processed already
@@ -210,7 +228,7 @@ function validURL(source) {
 }
 
 async function refreshImages(nodes) {
-    nodes = nodes || document.querySelectorAll("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")
+    nodes = nodes || document.querySelectorAll(imageSelector);
     let queue = []
     const workers = 4
 
@@ -233,16 +251,20 @@ async function refreshImages(nodes) {
 }
 
 async function hook() {
-    const observableSelector = "main[class*='chatContent-']"
     while(!document.querySelector(observableSelector)) {
+        log("waiting for observableSelector");
         await new Promise(r => setTimeout(r, 200));
     }
+
+    log("hooking into observableSelector");
 
     let observer = new MutationObserver(mutationRecords => {
         const images = [...new Set(mutationRecords.filter(x => {
             const source = x?.target?.firstChild?.src
             return validURL(source);
-        }).map(x => x?.target?.firstChild.closest("div[class*='imageWrapper-'], div[class*='spoilerContainer-']")))];
+        }).map(x => x?.target?.firstChild.closest(imageSelector)))];
+
+        log("found new images",images.length);
 
         if(images.length == 0) return;
         refreshImages(images)
