@@ -2,7 +2,7 @@
 // @name         png metadata discord
 // @description  Adds a button to reveal the prompt hidden in a png image, if it has one.
 // @author       moonshine
-// @version      3.4
+// @version      3.5
 // @downloadURL  https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
@@ -17,7 +17,7 @@ const debug = false;
 
 // DO NOT EDIT BELOW THIS LINE
 
-const containerSelector = "div[class*='messageAttachment_']";
+const containerSelector = "div[class*='mosaicItem_']";
 const imageSelector = "div[class*='imageWrapper_'], div[class*='spoilerContainer_']";
 const observableSelector = "main[class*='chatContent_']";
 
