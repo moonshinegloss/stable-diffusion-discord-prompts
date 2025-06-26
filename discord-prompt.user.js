@@ -2,7 +2,7 @@
 // @name         png metadata discord
 // @description  Adds a button to reveal the prompt hidden in a png image, if it has one.
 // @author       moonshine
-// @version      3.5
+// @version      3.6
 // @downloadURL  https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @updateURL    https://raw.githubusercontent.com/moonshinegloss/stable-diffusion-discord-prompts/main/discord-prompt.user.js
 // @match        https://discord.com/channels/*
@@ -194,8 +194,32 @@ async function processURL(url,node) {
                 method: "GET",
                 url,
                 responseType: "stream",
-                onloadstart: async (r) => {
-                    const reader = r.response.getReader();
+                onreadystatechange: function(response) {
+                    if (response.readyState === 3 && response.response) {
+                        processStream(response, resolve);
+                    }
+                },
+                onload: (response) => {
+                    if (response.response && chunks.length === 0) {
+                        processStream(response, resolve);
+                    }
+                },
+                onerror: (error) => {
+                    resolve([]);
+                },
+                onabort: () => {
+                    resolve([]);
+                },
+                ontimeout: () => {
+                    resolve([]);
+                }
+            });
+
+            async function processStream(response, resolve) {
+                if (chunks.length > 0) return;
+
+                try {
+                    const reader = response.response.getReader();
 
                     // process up to 2MB, to capture even large prompts
                     const kilobytes = 2000
@@ -206,11 +230,12 @@ async function processURL(url,node) {
                         received += value.length;
                     }
 
-                    resolve(chunks)
                     await reader.cancel();
-                    await req.abort()
+                    resolve(chunks);
+                } catch (error) {
+                    resolve([]);
                 }
-            });
+            }
         })
 
         if(chunks.length > 0) {
@@ -240,7 +265,12 @@ async function refreshImages(nodes) {
       if(showLoadingBorder) nodes[i].classList.add("prompt-preview-processing");
 
       queue.push(() => {
-          const url = source.replace("media.discordapp.net","cdn.discordapp.com")
+          let url = source.replace("media.discordapp.net","cdn.discordapp.com")
+
+          // Remove Discord's format conversion parameters to get original PNG with metadata
+          url = url.replace(/[&?]format=webp/g, '');
+          url = url.replace(/[&?]quality=lossless/g, '');
+
           processURL(url,nodes[i]);
       })
     }
